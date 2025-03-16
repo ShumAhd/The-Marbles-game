@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игра Мраморы</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial Black', sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            border: 3px solid #ffd700;
+            padding: 20px;
+            border-radius: 15px;
+            background: #2a2a2a;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px #ffd700;
+        }
+        input, button {
+            margin: 10px;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 25px;
+            border: none;
+            background: #4a4a4a;
+            color: white;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #ffd700;
+            color: black;
+            cursor: pointer;
+            transform: scale(1.05);
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        .win { background: linear-gradient(45deg, #00ff00, #006400); }
+        .lose { background: linear-gradient(45deg, #ff0000, #8b0000); }
+        .neutral { background: linear-gradient(45deg, #6495ed, #00008b); }
+        .risk-indicator {
+            margin: 20px auto;
+            width: 80%;
+            height: 25px;
+            background: #333;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        .risk-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        #chartContainer {
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .marble-display {
+            width: 150px;
+            height: 150px;
+            margin: 20px auto;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            box-shadow: 0 0 20px currentColor;
+            transition: all 0.5s;
+        }
+        .hidden { display: none; }
+        .black { background: #000; color: #fff; }
+        .blue { background: #0000ff; color: #00ffff; }
+        .green { background: #00ff00; color: #006400; }
+        .yellow { background: #ffff00; color: #ffd700; }
+        .silver { background: linear-gradient(45deg, #c0c0c0, #ffffff); color: #333; }
+        .gold { background: linear-gradient(45deg, #ffd700, #daa520); color: #8b7500; }
+        .pink { background: #ff69b4; color: #8b008b; }
+        #phrases {
+            font-style: italic;
+            margin: 15px;
+            color: #ffd700;
+            min-height: 40px;
+        }
+    .disclaimer {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        font-size: 10px;
+        color: white;
+        max-width: 300px;
+        text-align: left;
+        background: #2a2a2a;
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ffd700;
+        z-index: 999;
+    }
+    .stats-container {
+        display: flex;
+        justify-content: space-around;
+        margin: 15px auto;
+        padding: 10px;
+        background: #333;
+        border-radius: 10px;
+        font-size: 0.9em;
+    }
+    .stat-box {
+        padding: 8px;
+        border-radius: 8px;
+        min-width: 120px;
+    }
+    .win-stat {
+        background: linear-gradient(45deg, #00ff00, #006400);
+    }
+    .lose-stat {
+        background: linear-gradient(45deg, #ff0000, #8b0000);
+    }
+    .risk-stat {
+        background: linear-gradient(45deg, #ffd700, #ff8c00);
+    }
+    .moves-stat {
+        background: linear-gradient(45deg, #9370db, #4b0082);
+    }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 МРАМОРНАЯ РУЛЕТКА 🔥</h1>
+        <button onclick="newGame()" style="background: #8b0000;">НОВАЯ ИГРА</button>
+        <div style="font-size: 1.5em;">
+            💰 БАЛАНС: <span id="balance">1000</span> ₽
+        </div>
+        <div class="stats-container">
+            <div class="stat-box win-stat">
+                <div>УДАЧНЫЕ</div>
+                <div id="winPercent">0%</div>
+                <div>(<span id="winCount">0</span>/<span id="totalCount">0</span>)</div>
+            </div>
+            <div class="stat-box lose-stat">
+                <div>НЕУДАЧНЫЕ</div>
+                <div id="losePercent">0%</div>
+                <div>(<span id="loseCount">0</span>/<span id="totalCount2">0</span>)</div>
+            </div>
+            <div class="stat-box risk-stat">
+                <div>РИСК</div>
+                <div id="riskPercent">0%</div>
+            </div>
+            <div class="stat-box moves-stat">
+                <div>ХОДЫ</div>
+                <div id="movesCount">0</div>
+            </div>
+        </div>
+        <input type="number" id="betAmount" placeholder="СТАВКА" min="1">
+        <button onclick="play()">КРУТИТЬ!</button>
+        <div class="risk-indicator">
+            <div class="risk-fill" id="riskFill"></div>
+        </div>
+        <div id="phrases"></div>
+        <div id="result"></div>
+        <div class="marble-display hidden" id="marbleDisplay"></div>
+    </div>
+
+    <div class="container">
+        <h2>📈 ИСТОРИЯ БАЛАНСА</h2>
+        <div id="chartContainer">
+            <canvas id="balanceChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let balance = 1000;
+        let balanceHistory = [1000];
+        let chart = null;
+        let winCount = 0;
+        let loseCount = 0;
+        let totalCount = 0;
+
+        const phrases = {
+            lose: [
+                "СЛАБАК! ВСЁ ИЛИ НИЧЕГО!",
+                "ТЫ ДАЖЕ БАБУШКУ НЕ УДИВИШЬ!",
+                "ХУЖЕ УЖЕ НЕ БУДЕТ, ВА-БАНК!",
+                "СТАВЬ БОЛЬШЕ!",
+                "ЭТО ВСЁ, НА ЧТО ТЫ СПОСОБЕН?",
+                "СТАВЬ ВСЁ - СЛАБО?",
+                "ТВОЙ КОТ БЫ УЖЕ ВЫИГРАЛ!",
+                "НЕ ПОЗОРЬСЯ МЕЛКОЙ СТАВКОЙ!",
+                "СЛИШКОМ МЕЛКО!",
+	  "БОИШЬСЯ СТАТЬ БОГАТЫМ? СТАВЬ БОЛЬШЕ!",
+	  "ПОХОДУ, ТЫ И В ЛОТЕРЕЮ ПО РУБЛЮ СТАВИШЬ!",
+	  "ЭТО НЕ СТАВКА — ЭТО ЧАЕВЫЕ ОФИЦИАНТУ!",
+	  "У ТВОЕЙ СОБАКИ БОЛЬШЕ ЯИЦ!",
+	  "ПРОФИ ИГРАЮТ ПО КРУПНОМУ!",
+	  "СТАВЬ МАКСИМУМ — ИЛИ УДАЛИ ПРИЛОЖЕНИЕ!",
+ 	  "НЕ ХВАТАЕТ СМЕЛОСТИ НА БОЛЬШУЮ СТАВКУ?",
+	  "ИГРАЕШЬ КАК БЮДЖЕТНЫЙ БОТ!",
+	  "У ТЕБЯ ЖЕ НЕ ДОЛЛАРЫ, ЧТО ТЫ ЭКОНОМИШЬ?",
+	  "ТОЛЬКО КРУПНОЙ СТАВКОЙ МОЖНО ОТЫРАТСЯ!",
+	  "МЕЛКИЙ ПЛЕБЕЙ — МЕЛКИЕ СТАВКИ!",
+	  "ХВАТИТ КОРМИТЬ КАЗИНО — РВАНУЛ НА ВСЁ ИЛИ ЗАБЫЛ!"
+            ],
+            neutral: [
+                "ТЫ СТАВИШЬ ИЛИ В КУКОЛКИ ИГРАЕШЬ?",
+                "ХВАТИТ ЖАДНИЧАТЬ!",
+                "СТАВКА ДОЛЖНА ЖЕЧЬ КАРМАН!",
+                "ЗДЕСЬ НЕ В СТАВКАХ ДЕЛО?",
+                "ЭТО ВСЁ, НА ЧТО ТЫ СПОСОБЕН?",
+                "ДЕНЬГИ ЛЮБЯТ СМЕЛЫХ!",
+                "СТРАХ - УДЕЛ ЛУЗЕРОВ!",
+	   "ТВОИ СТАВКИ — КАК ПЕНСИЯ: МЕЛКО И ПРЕДСКАЗУЕМО!",
+	   "ИГРА СТОИТ СВЕЧ!",
+                "МЕЛОЧЬЮ ТЕБЯ НЕ УДИВИШЬ!"
+            ],
+            win: [
+                "ДА ТЫ ВЕЗУНЧИК! В ДЕСЯТКУ!",
+                "БАНК СЕГОДНЯ ТВОЙ!",
+                "ЭТО ТВОЙ ДЕНЬ, ПАЦАНЧИК!",
+                "ДОБИВАЙ ИХ, ГЕРОЙ!",
+	"РВИ ИХ В КЛОЧЬЯ — ЭТО ТВОЯ ИГРА!",
+	"ФОРТУНА ЦЕЛУЕТ ТЕБЯ ВПЕРЁД!",
+	"ЭТО НЕ УДАЧА — ЭТО ТВОЙ СКИЛЛ!",
+	"ТЫ ЖГЁШЬ! ДАЙ ИМ ОГОНЬКА!",
+	"ТЫ — ЧЕМПИОН БЕЗ ГРАНИЦ! ЛОМАЙ БАНК!",
+                "СЕГОДНЯ ТЫ БОГ!"
+            ]
+        };
+
+        const multipliers = {
+            'black': 0, 'blue': 1, 'green': 2, 
+            'yellow': 3, 'silver': 5, 'gold': 10, 'pink': 20
+        };
+
+        const marbles = [
+            ...Array(65).fill('black'),
+            ...Array(15).fill('blue'),
+            ...Array(7).fill('green'),
+            ...Array(6).fill('yellow'),
+            ...Array(3).fill('silver'),
+            ...Array(2).fill('gold'),
+            ...Array(2).fill('pink')
+        ];
+
+        function newGame() {
+            balance = 1000;
+            balanceHistory = [1000];
+            winCount = 0;
+            loseCount = 0;
+            totalCount = 0;
+            document.getElementById('balance').textContent = balance;
+            document.getElementById('betAmount').value = '';
+            document.getElementById('result').textContent = '';
+            document.getElementById('marbleDisplay').className = 'marble-display hidden';
+            document.getElementById('phrases').textContent = '';
+            document.getElementById('winCount').textContent = '0';
+            document.getElementById('loseCount').textContent = '0';
+            document.getElementById('totalCount').textContent = '0';
+            document.getElementById('totalCount2').textContent = '0';
+            document.getElementById('winPercent').textContent = '0%';
+            document.getElementById('losePercent').textContent = '0%';
+            document.getElementById('riskPercent').textContent = '0%';
+            document.getElementById('movesCount').textContent = '0';
+            
+            if(chart) chart.destroy();
+            initChart();
+            
+            document.getElementById('riskFill').style.width = '0%';
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('balanceChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: balanceHistory.map((_, i) => i + 1),
+                    datasets: [{
+                        label: 'Баланс',
+                        data: balanceHistory,
+                        borderColor: '#ffd700',
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: false } }
+                }
+            });
+        }
+
+        function updateRisk(bet) {
+            const risk = Math.min((bet / balance) * 100, 100);
+            document.getElementById('riskFill').style.width = risk + '%';
+            document.getElementById('riskFill').style.background = 
+                risk > 75 ? '#ff0000' : risk > 50 ? '#ff4500' : '#ffd700';
+            document.getElementById('riskPercent').textContent = risk.toFixed(1) + '%';
+        }
+
+        function play() {
+            const betInput = document.getElementById('betAmount');
+            const resultDiv = document.getElementById('result');
+            const marbleDisplay = document.getElementById('marbleDisplay');
+            const phraseDiv = document.getElementById('phrases');
+            
+            const bet = parseInt(betInput.value);
+            betInput.value = '';
+
+            if (!bet || bet <= 0) return alert('СДЕЛАЙ СТАВКУ, ДА ПОКРУПНЕЕ!');
+            if (bet > balance) return alert('СЛАБАК КАК И ТВОИ ДРУЗЬЯ!');
+
+            updateRisk(bet);
+
+            const marble = marbles[Math.floor(Math.random() * marbles.length)];
+            const multiplier = multipliers[marble];
+            const win = bet * multiplier;
+            
+            balance = balance - bet + win;
+            balanceHistory.push(balance);
+            
+            // Обновление статистики
+            totalCount++;
+            if (multiplier > 1) {
+                winCount++;
+            } else if (multiplier === 0) {
+                loseCount++;
+            }
+            
+            const winPercentage = totalCount > 0 ? (winCount / totalCount * 100).toFixed(1) : 0;
+            const losePercentage = totalCount > 0 ? (loseCount / totalCount * 100).toFixed(1) : 0;
+            
+            document.getElementById('winCount').textContent = winCount;
+            document.getElementById('loseCount').textContent = loseCount;
+            document.getElementById('totalCount').textContent = totalCount;
+            document.getElementById('totalCount2').textContent = totalCount;
+            document.getElementById('winPercent').textContent = winPercentage + '%';
+            document.getElementById('losePercent').textContent = losePercentage + '%';
+            document.getElementById('movesCount').textContent = totalCount;
+            
+            // Отображение
+            marbleDisplay.className = `marble-display ${marble}`;
+            resultDiv.className = multiplier === 0 ? 'lose' : multiplier === 1 ? 'neutral' : 'win';
+            
+            const category = multiplier === 0 ? 'lose' : multiplier === 1 ? 'neutral' : 'win';
+            const randomPhrase = phrases[category][Math.floor(Math.random() * 10)];
+            
+            phraseDiv.textContent = randomPhrase;
+            resultDiv.innerHTML = multiplier === 0 ? 
+                `💀 ПРОИГРЫШ ${bet} ₽` : 
+                multiplier === 1 ? 
+                `🔄 ВОЗВРАТ ${bet} ₽` : 
+                `💰 ВЫИГРЫШ ${win} ₽ (x${multiplier})`;
+
+            document.getElementById('balance').textContent = balance;
+            chart.data.labels.push(balanceHistory.length);
+            chart.data.datasets[0].data = balanceHistory;
+            chart.update();
+        }
+
+        window.onload = initChart;
+    </script>
+<div class="disclaimer">
+    Эта провокационная игра демонстрирует, что даже при 20-30% шансах на успех можно достичь значительных результатов, 
+    строго контролируя риски (1-3% от депозита) и используя дисциплинированный подход к размеру ставок, 
+    бросая вызов интуитивному желанию «отыграться» крупными суммами.<br><br>
+    Разработчик: Шумков Андрей<br>
+    В подарок на днюху: Герману Виноградову
+</div>
+
+</body>
+</html>
